@@ -63,7 +63,7 @@ exports.sendOTP = async (req, res) => {
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     user.otp = otp;
-    user.otpExpire = Date.now() + 10 * 60 * 1000;
+    user.otpExpire = Date.now() + 10 * 60 * 1000; // 10 minutes expiry
     await user.save();
 
     if (method === 'email') {
@@ -127,6 +127,69 @@ exports.verifyOTP = async (req, res) => {
 };
 
 /**
+ * ✅ FORGOT PASSWORD: Send Reset Code
+ * Generates a short-lived recovery code sent to the operative's email.
+ */
+exports.forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ msg: "Operative email not found." });
+
+    // Generate 6-digit Reset Code
+    const resetOTP = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Set expiration for 10 minutes
+    user.resetPasswordOTP = resetOTP;
+    user.resetPasswordExpires = Date.now() + 600000; 
+    await user.save();
+
+    // Transmit via existing email utility
+    await sendEmail({
+      email: user.email,
+      subject: 'CyberSecure-Hub Access Recovery',
+      otp: resetOTP
+    });
+
+    res.json({ msg: "Recovery code transmitted to system email." });
+  } catch (err) {
+    console.error("Forgot Password Error:", err);
+    res.status(500).json({ msg: "Server infrastructure fault." });
+  }
+};
+
+/**
+ * ✅ RESET PASSWORD: Finalize Credential Update
+ * Verifies recovery code and applies a new master access key.
+ */
+exports.resetPassword = async (req, res) => {
+  const { email, otp, newPassword } = req.body;
+  try {
+    const user = await User.findOne({ 
+      email, 
+      resetPasswordOTP: otp,
+      resetPasswordExpires: { $gt: Date.now() } // Must not be expired
+    });
+
+    if (!user) return res.status(400).json({ msg: "Invalid or expired recovery code." });
+
+    // Apply new password (hashed by User model hook)
+    user.password = newPassword;
+
+    // Clear reset fields for security
+    user.resetPasswordOTP = undefined;
+    user.resetPasswordExpires = undefined;
+    
+    await user.save();
+    console.log(`[AUTH] Access credentials successfully updated via recovery for: ${email}`);
+    res.json({ msg: "Access credentials successfully updated." });
+  } catch (err) {
+    console.error("Reset Password Error:", err);
+    res.status(500).json({ msg: "Reset protocol failure." });
+  }
+};
+
+/**
  * ✅ SETTINGS: CHANGE PASSWORD
  * Secured via authMiddleware to allow operatives to update credentials.
  */
@@ -134,17 +197,14 @@ exports.changePassword = async (req, res) => {
   const { oldPassword, newPassword } = req.body;
 
   try {
-    // 1. Locate user via ID from the JWT payload
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ msg: "Operative profile not found." });
 
-    // 2. Validate current password before allowing change
     const isMatch = await bcrypt.compare(oldPassword, user.password);
     if (!isMatch) {
       return res.status(400).json({ msg: "Current password verification failed." });
     }
 
-    // 3. Apply new password (hashed automatically by User model pre-save hook)
     user.password = newPassword;
     await user.save();
 

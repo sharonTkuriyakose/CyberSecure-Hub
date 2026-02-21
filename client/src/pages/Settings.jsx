@@ -6,19 +6,28 @@ import {
 import { Link } from 'react-router-dom';
 import API from '../services/api';
 
+// ✅ Helper function to calculate password entropy
+const calculateStrength = (password) => {
+  let score = 0;
+  if (!password) return 0;
+  if (password.length > 8) score += 1; 
+  if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score += 1; 
+  if (/\d/.test(password)) score += 1; 
+  if (/[^A-Za-z0-9]/.test(password)) score += 1; 
+  return score; // Max score 4
+};
+
 const Settings = () => {
   const [user, setUser] = useState({ username: 'Operative', email: 'N/A' });
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [passwordData, setPasswordData] = useState({ oldPassword: '', newPassword: '' });
   const [status, setStatus] = useState({ msg: '', type: '' });
+  const [strength, setStrength] = useState(0); 
   
-  // Visibility Toggles
   const [showOldPass, setShowOldPass] = useState(false);
   const [showNewPass, setShowNewPass] = useState(false);
 
-  // 1. IDENTITY & THEME SYNC ON MOUNT
   useEffect(() => {
-    // Sync User Identity
     const savedUserString = localStorage.getItem('user');
     if (savedUserString) {
       try {
@@ -32,28 +41,25 @@ const Settings = () => {
       }
     }
 
-    // ✅ Sync Theme Toggle State with Global Attribute
     const savedTheme = localStorage.getItem('theme') || 'dark';
     setIsDarkMode(savedTheme === 'dark');
     document.documentElement.setAttribute('data-theme', savedTheme);
   }, []);
 
-  // 2. GLOBAL THEME TOGGLE (MASTER SWITCH)
   const toggleTheme = () => {
     const newTheme = !isDarkMode ? 'dark' : 'light';
     setIsDarkMode(!isDarkMode);
-    
-    // Persist for all pages to detect
     localStorage.setItem('theme', newTheme);
-    
-    // ✅ Apply immediate global attribute update to trigger CSS variables
     document.documentElement.setAttribute('data-theme', newTheme);
-    
-    // Fallback for body background (Legacy support)
     document.body.style.backgroundColor = newTheme === 'dark' ? '#020617' : '#f1f5f9';
   };
 
-  // 3. SECURE PASSWORD UPDATE
+  const handleNewPasswordChange = (e) => {
+    const val = e.target.value;
+    setPasswordData({ ...passwordData, newPassword: val });
+    setStrength(calculateStrength(val));
+  };
+
   const handlePasswordChange = async (e) => {
     e.preventDefault();
     setStatus({ msg: 'Processing cryptographic update...', type: 'info' });
@@ -62,6 +68,7 @@ const Settings = () => {
       await API.post('/auth/change-password', passwordData);
       setStatus({ msg: 'Access credentials updated successfully.', type: 'success' });
       setPasswordData({ oldPassword: '', newPassword: '' });
+      setStrength(0); 
     } catch (err) {
       setStatus({ msg: err.response?.data?.msg || 'Update failed.', type: 'error' });
     }
@@ -102,7 +109,7 @@ const Settings = () => {
             </div>
           </div>
 
-          {/* Password Section with Eye Option */}
+          {/* Password Section */}
           <div style={{...settingCard, background: 'var(--card-bg)', gridColumn: 'span 2'}}>
             <h3 style={sectionTitle}><FaLock /> Update Access Credentials</h3>
             <form onSubmit={handlePasswordChange} style={form}>
@@ -110,32 +117,49 @@ const Settings = () => {
                 
                 {/* Old Password Input */}
                 <div style={relativeContainer}>
-                  <input 
-                    type={showOldPass ? "text" : "password"} 
-                    placeholder="Old Password" 
-                    style={{...input, background: 'var(--bg-secondary)', color: 'var(--text-primary)'}}
-                    value={passwordData.oldPassword}
-                    onChange={(e) => setPasswordData({...passwordData, oldPassword: e.target.value})}
-                    required
-                  />
-                  <div style={eyeIcon} onClick={() => setShowOldPass(!showOldPass)}>
-                    {showOldPass ? <FaEyeSlash /> : <FaEye />}
+                  <div style={inputWrapper}>
+                    <input 
+                      type={showOldPass ? "text" : "password"} 
+                      placeholder="Old Password" 
+                      style={{...input, background: 'var(--bg-secondary)', color: 'var(--text-primary)'}}
+                      value={passwordData.oldPassword}
+                      onChange={(e) => setPasswordData({...passwordData, oldPassword: e.target.value})}
+                      required
+                    />
+                    <div style={eyeIcon} onClick={() => setShowOldPass(!showOldPass)}>
+                      {showOldPass ? <FaEyeSlash /> : <FaEye />}
+                    </div>
                   </div>
                 </div>
 
                 {/* New Password Input */}
                 <div style={relativeContainer}>
-                  <input 
-                    type={showNewPass ? "text" : "password"} 
-                    placeholder="New Secure Password" 
-                    style={{...input, background: 'var(--bg-secondary)', color: 'var(--text-primary)'}}
-                    value={passwordData.newPassword}
-                    onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
-                    required
-                  />
-                  <div style={eyeIcon} onClick={() => setShowNewPass(!showNewPass)}>
-                    {showNewPass ? <FaEyeSlash /> : <FaEye />}
+                  {/* ✅ Fixed Input Wrapper for Icon Centering */}
+                  <div style={inputWrapper}>
+                    <input 
+                      type={showNewPass ? "text" : "password"} 
+                      placeholder="New Secure Password" 
+                      style={{...input, background: 'var(--bg-secondary)', color: 'var(--text-primary)'}}
+                      value={passwordData.newPassword}
+                      onChange={handleNewPasswordChange}
+                      required
+                    />
+                    <div style={eyeIcon} onClick={() => setShowNewPass(!showNewPass)}>
+                      {showNewPass ? <FaEyeSlash /> : <FaEye />}
+                    </div>
                   </div>
+
+                  {/* 📈 REAL-TIME STRENGTH METER - Now sits below the icon alignment */}
+                  <div style={meterContainer}>
+                    <div style={{
+                      ...meterBar, 
+                      width: `${(strength / 4) * 100}%`, 
+                      background: strength < 2 ? '#ef4444' : strength < 4 ? '#f59e0b' : '#10b981' 
+                    }} />
+                  </div>
+                  <p style={{...strengthLabel, color: strength === 4 ? '#10b981' : 'var(--text-secondary)'}}>
+                    Entropy Level: {['Critical', 'Weak', 'Moderate', 'Strong', 'Military Grade'][strength]}
+                  </p>
                 </div>
 
               </div>
@@ -149,7 +173,7 @@ const Settings = () => {
   );
 };
 
-/* ===== STYLES (Switched to CSS Variables) ===== */
+/* ===== STYLES ===== */
 const pageWrapper = { minHeight: '100vh', width: '100%', padding: '40px', boxSizing: 'border-box', transition: '0.3s' };
 const fullWidthContainer = { width: '100%', maxWidth: '1400px', margin: '0 auto' };
 const header = { marginBottom: '40px' };
@@ -168,9 +192,15 @@ const form = { display: 'flex', flexDirection: 'column', gap: '20px' };
 const inputGroup = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' };
 
 const relativeContainer = { position: 'relative', width: '100%' };
-const input = { width: '100%', padding: '15px 45px 15px 15px', border: '1px solid var(--border-color)', borderRadius: '12px', fontSize: '1rem', outline: 'none', boxSizing: 'border-box', transition: '0.3s' };
-const eyeIcon = { position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '1.2rem', display: 'flex', alignItems: 'center' };
+// ✅ Added Input Wrapper to lock icon positioning within the field boundaries
+const inputWrapper = { position: 'relative', width: '100%' };
 
+const input = { width: '100%', padding: '15px 45px 15px 15px', border: '1px solid var(--border-color)', borderRadius: '12px', fontSize: '1rem', outline: 'none', boxSizing: 'border-box', transition: '0.3s' };
+const eyeIcon = { position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '1.2rem', display: 'flex', alignItems: 'center', zIndex: 2 };
 const saveBtn = { width: 'fit-content', padding: '15px 40px', background: 'var(--accent-color)', color: '#020617', border: 'none', borderRadius: '12px', fontWeight: '900', cursor: 'pointer', fontSize: '1rem' };
+
+const meterContainer = { width: '100%', height: '6px', background: 'var(--bg-primary)', borderRadius: '10px', marginTop: '12px', overflow: 'hidden' };
+const meterBar = { height: '100%', transition: '0.4s cubic-bezier(0.4, 0, 0.2, 1)' };
+const strengthLabel = { fontSize: '0.75rem', marginTop: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' };
 
 export default Settings;

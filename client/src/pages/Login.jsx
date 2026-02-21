@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import API, { loginUser, registerUser } from '../services/api'; 
 import { 
   FaShieldAlt, FaFolderOpen, FaStickyNote, FaKey, 
-  FaUserPlus, FaTerminal, FaFingerprint, FaEnvelope, FaArrowLeft
+  FaUserPlus, FaTerminal, FaFingerprint, FaEnvelope, FaArrowLeft, FaSyncAlt
 } from 'react-icons/fa';
 
 const Login = () => {
   const [isLogin, setIsLogin] = useState(true);
-  const [step, setStep] = useState(1); 
+  const [step, setStep] = useState(1); // 1: Credentials, 2: Method, 3: Login OTP, 4: Forgot Email, 5: Reset Final
   const [userId, setUserId] = useState(null);
   const [otp, setOtp] = useState('');
   const [formData, setFormData] = useState({ username: '', email: '', password: '' });
@@ -15,10 +15,8 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
 
-  // 1. SECURITY RESET & THEME SYNC
   useEffect(() => {
     localStorage.removeItem('token'); 
-    // Ensure the root theme is applied to the login page background
     const savedTheme = localStorage.getItem('theme') || 'dark';
     document.documentElement.setAttribute('data-theme', savedTheme);
   }, []);
@@ -34,6 +32,8 @@ const Login = () => {
     setStep(1);
     setFormData({ username: '', email: '', password: '' });
   };
+
+  // --- HANDLERS ---
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -64,6 +64,43 @@ const Login = () => {
     }
   };
 
+  // Triggered when user clicks "Forgot Access Key?"
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await API.post('/auth/forgot-password', { email: formData.email });
+      setSuccessMsg("Recovery code transmitted. Check your inbox.");
+      setStep(5); // Move to OTP verification and New Password entry
+    } catch (err) {
+      setError(err.response?.data?.msg || 'Email not found in system records.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Finalizes the password reset using the OTP and new password
+  const handleResetFinal = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await API.post('/auth/reset-password', { 
+        email: formData.email, 
+        otp, 
+        newPassword: formData.password 
+      });
+      setSuccessMsg("Access Key updated. You may now login.");
+      setStep(1);
+      setOtp('');
+    } catch (err) {
+      setError(err.response?.data?.msg || 'Invalid code or reset failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSelectMethod = async (method) => {
     setLoading(true);
     setError('');
@@ -83,24 +120,13 @@ const Login = () => {
     setLoading(true);
     try {
       const res = await API.post('/auth/verify-otp', { userId, otp });
-      
       if (res.data.token) {
-        // Keep theme preference but clear other session data
         const currentTheme = localStorage.getItem('theme');
         localStorage.clear(); 
         if (currentTheme) localStorage.setItem('theme', currentTheme);
-        
         localStorage.setItem('token', res.data.token);
-        localStorage.setItem('user', JSON.stringify(res.data.user)); // Sync user metadata
-        
-        const isSet = !!localStorage.getItem('token');
-        if (isSet) {
-          setTimeout(() => {
-            window.location.replace('/dashboard'); 
-          }, 300); 
-        } else {
-          setError("Session storage failure. Verify browser permissions.");
-        }
+        localStorage.setItem('user', JSON.stringify(res.data.user));
+        window.location.replace('/dashboard'); 
       }
     } catch (err) {
       setError(err.response?.data?.msg || 'Invalid or expired verification code.');
@@ -135,6 +161,7 @@ const Login = () => {
 
       <div style={formSide}>
         <div style={loginBox}>
+          {/* STEP 1: INITIAL LOGIN/REGISTER */}
           {step === 1 && (
             <>
               <h2 style={{ color: 'var(--text-primary)', marginBottom: '8px' }}>
@@ -166,6 +193,13 @@ const Login = () => {
                   {loading ? "Processing..." : isLogin ? <><FaKey /> Unlock Session</> : <><FaUserPlus /> Create Account</>}
                 </button>
               </form>
+
+              {isLogin && (
+                <button onClick={() => setStep(4)} style={{...toggleButton, marginTop: '15px', textDecoration: 'none'}}>
+                  Forgot Access Key?
+                </button>
+              )}
+
               <p style={registerLink}>
                 {isLogin ? "New operative?" : "Already registered?"} 
                 <button onClick={toggleAuthMode} style={toggleButton}>
@@ -175,6 +209,7 @@ const Login = () => {
             </>
           )}
 
+          {/* STEP 2: MFA METHOD SELECT */}
           {step === 2 && (
             <>
               <h2 style={{ color: 'var(--text-primary)', marginBottom: '8px' }}>Security Verification</h2>
@@ -192,6 +227,7 @@ const Login = () => {
             </>
           )}
 
+          {/* STEP 3: MFA OTP VERIFY */}
           {step === 3 && (
             <>
               <FaFingerprint style={{ fontSize: '3.5rem', color: 'var(--accent-color)', marginBottom: '20px' }} />
@@ -203,15 +239,7 @@ const Login = () => {
               <form onSubmit={handleVerifyOTP} style={formStyle}>
                 <div style={inputGroup}>
                   <label style={labelStyle}>One-Time Key</label>
-                  <input 
-                    type="text" 
-                    placeholder="000000" 
-                    maxLength="6" 
-                    value={otp} 
-                    onChange={(e) => setOtp(e.target.value)} 
-                    required 
-                    style={otpInputStyle} 
-                  />
+                  <input type="text" placeholder="000000" maxLength="6" value={otp} onChange={(e) => setOtp(e.target.value)} required style={otpInputStyle} />
                 </div>
                 <button type="submit" disabled={loading} style={buttonStyle}>
                   {loading ? "Verifying..." : "Unlock Dashboard"}
@@ -222,13 +250,65 @@ const Login = () => {
               </form>
             </>
           )}
+
+          {/* STEP 4: FORGOT PASSWORD - EMAIL REQUEST */}
+          {step === 4 && (
+            <>
+              <h2 style={{ color: 'var(--text-primary)', marginBottom: '8px' }}>Recover Access</h2>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '32px', fontSize: '0.95rem' }}>
+                Enter your system email to initiate a security reset.
+              </p>
+              {error && <p style={errorStyle}>⚠️ {error}</p>}
+              <form onSubmit={handleForgotPassword} style={formStyle}>
+                <div style={inputGroup}>
+                  <label style={labelStyle}>System Email</label>
+                  <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="operator@cybersecure.com" required style={inputStyle} />
+                </div>
+                <button type="submit" disabled={loading} style={buttonStyle}>
+                  {loading ? "Transmitting..." : "Send Reset Code"}
+                </button>
+                <button type="button" onClick={() => setStep(1)} style={toggleButton}>
+                  <FaArrowLeft /> Cancel
+                </button>
+              </form>
+            </>
+          )}
+
+          {/* STEP 5: FORGOT PASSWORD - OTP + NEW PASSWORD */}
+          {step === 5 && (
+            <>
+              <FaSyncAlt style={{ fontSize: '3.5rem', color: 'var(--accent-color)', marginBottom: '20px' }} />
+              <h2 style={{ color: 'var(--text-primary)', marginBottom: '8px' }}>Reset Credentials</h2>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '32px', fontSize: '0.95rem' }}>
+                Verify the reset code and establish a new access key.
+              </p>
+              {successMsg && <p style={successStyle}>✅ {successMsg}</p>}
+              {error && <p style={errorStyle}>⚠️ {error}</p>}
+              <form onSubmit={handleResetFinal} style={formStyle}>
+                <div style={inputGroup}>
+                  <label style={labelStyle}>Reset Code</label>
+                  <input type="text" placeholder="000000" maxLength="6" value={otp} onChange={(e) => setOtp(e.target.value)} required style={otpInputStyle} />
+                </div>
+                <div style={inputGroup}>
+                  <label style={labelStyle}>New Access Key</label>
+                  <input type="password" name="password" placeholder="••••••••" onChange={handleChange} required style={inputStyle} />
+                </div>
+                <button type="submit" disabled={loading} style={buttonStyle}>
+                  {loading ? "Updating..." : "Update Credentials"}
+                </button>
+                <button type="button" onClick={() => setStep(4)} style={resendButtonStyle}>
+                  Resend Recovery Email
+                </button>
+              </form>
+            </>
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-// --- STYLES REFINED FOR THEME SYNC ---
+// --- STYLES (NO CHANGES NEEDED TO EXISTING OBJECTS) ---
 
 const fullPageWrapper = { display: 'flex', width: '100vw', height: '100vh', background: 'var(--bg-primary)', position: 'fixed', top: 0, left: 0, zIndex: 999, overflow: 'hidden', transition: 'background 0.3s ease' };
 const contentSide = { flex: 1.4, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 80px', background: 'var(--bg-primary)', borderRight: '1px solid var(--border-color)' };
@@ -247,48 +327,14 @@ const loginBox = { width: '100%', maxWidth: '400px', padding: '40px', background
 const formStyle = { display: 'flex', flexDirection: 'column', gap: '20px' };
 const inputGroup = { display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left' };
 const labelStyle = { color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase' };
-
-const inputStyle = { 
-  padding: '12px', 
-  borderRadius: '10px', 
-  border: '1px solid var(--border-color)',
-  background: 'var(--bg-secondary)', 
-  color: 'var(--text-primary)', 
-  outline: 'none',
-  transition: '0.3s'
-};
-
-const otpInputStyle = {
-  ...inputStyle,
-  textAlign: 'center', 
-  fontSize: '1.5rem', 
-  letterSpacing: '8px'
-};
-
+const inputStyle = { padding: '12px', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', outline: 'none', transition: '0.3s' };
+const otpInputStyle = { ...inputStyle, textAlign: 'center', fontSize: '1.5rem', letterSpacing: '8px' };
 const buttonStyle = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '14px', background: 'var(--accent-color)', color: '#020617', fontWeight: '800', border: 'none', borderRadius: '10px', cursor: 'pointer' };
 const methodButtonStyle = { ...buttonStyle, background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' };
 const errorStyle = { color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', padding: '14px', borderRadius: '8px', marginBottom: '20px', fontSize: '0.9rem' };
 const successStyle = { color: '#22c55e', background: 'rgba(34, 197, 94, 0.1)', padding: '14px', borderRadius: '8px', marginBottom: '20px', fontSize: '0.9rem' };
 const registerLink = { marginTop: '30px', color: 'var(--text-secondary)', fontSize: '0.9rem' };
-
-const toggleButton = { 
-  background: 'none', 
-  border: 'none', 
-  color: 'var(--accent-color)', 
-  fontWeight: 'bold', 
-  cursor: 'pointer', 
-  marginLeft: '5px', 
-  textDecoration: 'underline', 
-  display: 'flex', 
-  alignItems: 'center', 
-  gap: '5px', 
-  justifyContent: 'center' 
-};
-
-const resendButtonStyle = {
-  ...toggleButton, 
-  marginTop: '10px', 
-  textDecoration: 'none'
-};
+const toggleButton = { background: 'none', border: 'none', color: 'var(--accent-color)', fontWeight: 'bold', cursor: 'pointer', marginLeft: '5px', textDecoration: 'underline', display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'center' };
+const resendButtonStyle = { ...toggleButton, marginTop: '10px', textDecoration: 'none' };
 
 export default Login;

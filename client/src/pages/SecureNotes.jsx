@@ -15,6 +15,23 @@ const SecureNotes = () => {
     fetchAndDecryptNotes();
   }, []);
 
+  /**
+   * ✅ Safely formats the MongoDB timestamp
+   */
+  const formatStoredDate = (dateString) => {
+    if (!dateString) return "Date Unknown";
+    const date = new Date(dateString);
+    
+    // Check if the date object is valid to prevent "Invalid Date" display
+    if (isNaN(date.getTime())) return "Date Unknown";
+
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
   const fetchAndDecryptNotes = async () => {
     try {
       setLoading(true);
@@ -131,7 +148,11 @@ const SecureNotes = () => {
                 />
               </div>
               <p style={noteContent}>{note.content}</p>
-              <div style={timestamp}>Stored: {new Date(note.createdAt).toLocaleDateString()}</div>
+              
+              {/* ✅ UPDATED DATE DISPLAY */}
+              <div style={timestamp}>
+                Stored: {formatStoredDate(note.createdAt)}
+              </div>
             </div>
           ))}
         </div>

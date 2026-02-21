@@ -16,34 +16,35 @@ const UserSchema = new mongoose.Schema({
     type: String, 
     required: true 
   },
-  // Fields for the Two-Step Verification flow
+  // Fields for the standard Login MFA flow
   otp: { 
     type: String 
   },
   otpExpire: { 
     type: Date 
+  },
+  // ✅ NEW: Fields for the Forgot Password flow
+  resetPasswordOTP: { 
+    type: String 
+  },
+  resetPasswordExpires: { 
+    type: Date 
   }
-}, { timestamps: true }); // Automatically manages createdAt and updatedAt
+}, { timestamps: true });
 
 /**
  * Password Hashing Middleware
- * Fixes the "next is not a function" error by removing the next callback.
- * Async middleware in Mongoose proceeds automatically upon completion.
+ * Automatically hashes the password before saving to MongoDB.
  */
 UserSchema.pre('save', async function() {
-  // 1. Only hash the password if it's being modified or created
   if (!this.isModified('password')) return;
 
-  // 2. Generate a secure salt and hash the password
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
-  
-  // No next() call is required for async pre-save hooks
 });
 
 /**
  * Password Verification Method
- * Compares plain text login password with the hashed password in the DB.
  */
 UserSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
