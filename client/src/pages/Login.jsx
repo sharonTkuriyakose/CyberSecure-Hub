@@ -1,29 +1,61 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import API, { loginUser, registerUser } from '../services/api'; 
 import { 
-  FaShieldAlt, FaFolderOpen, FaStickyNote, FaKey, 
-  FaUserPlus, FaTerminal, FaFingerprint, FaEnvelope, FaArrowLeft, FaSyncAlt
+  FaShieldAlt, FaUserPlus, FaFingerprint, FaEnvelope, FaKey, FaArrowLeft, FaSyncAlt
 } from 'react-icons/fa';
 
 const Login = () => {
   const [isLogin, setIsLogin] = useState(true);
-  const [step, setStep] = useState(1); // 1: Credentials, 2: Method, 3: Login OTP, 4: Forgot Email, 5: Reset Final
+  const [step, setStep] = useState(1); // 1: Creds, 2: MFA Method, 3: OTP, 4: Forgot Email, 5: Reset Final
   const [userId, setUserId] = useState(null);
   const [otp, setOtp] = useState('');
   const [formData, setFormData] = useState({ username: '', email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const canvasRef = useRef(null);
+
+  const themeBlue = '#38bdf8'; 
 
   useEffect(() => {
     localStorage.removeItem('token'); 
     const savedTheme = localStorage.getItem('theme') || 'dark';
     document.documentElement.setAttribute('data-theme', savedTheme);
+    
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    
+    const initCanvas = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      particles = Array.from({ length: 100 }, () => ({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        size: Math.random() * 2,
+        speedX: (Math.random() - 0.5) * 0.5,
+        speedY: (Math.random() - 0.5) * 0.5,
+      }));
+    };
+
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.4)'; 
+      particles.forEach(p => {
+        p.x += p.speedX; p.y += p.speedY;
+        if (p.x < 0 || p.x > canvas.width) p.speedX *= -1;
+        if (p.y < 0 || p.y > canvas.height) p.speedY *= -1;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+      });
+      requestAnimationFrame(animate);
+    };
+
+    initCanvas(); animate();
+    window.addEventListener('resize', initCanvas);
+    return () => window.removeEventListener('resize', initCanvas);
   }, []);
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
   const toggleAuthMode = () => {
     setIsLogin(!isLogin);
@@ -33,12 +65,9 @@ const Login = () => {
     setFormData({ username: '', email: '', password: '' });
   };
 
-  // --- HANDLERS ---
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setSuccessMsg('');
     setLoading(true);
     try {
       if (isLogin) {
@@ -48,23 +77,15 @@ const Login = () => {
           setStep(2); 
         }
       } else {
-        await registerUser({ 
-          username: formData.username, 
-          email: formData.email, 
-          password: formData.password 
-        });
+        await registerUser({ username: formData.username, email: formData.email, password: formData.password });
         setSuccessMsg("Operative profile initialized. Please log in.");
         setIsLogin(true);
-        setFormData({ username: '', email: '', password: '' });
       }
     } catch (err) {
       setError(err.response?.data?.msg || 'Access denied. Verify system credentials.');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
-  // Triggered when user clicks "Forgot Access Key?"
   const handleForgotPassword = async (e) => {
     e.preventDefault();
     setError('');
@@ -72,46 +93,31 @@ const Login = () => {
     try {
       await API.post('/auth/forgot-password', { email: formData.email });
       setSuccessMsg("Recovery code transmitted. Check your inbox.");
-      setStep(5); // Move to OTP verification and New Password entry
-    } catch (err) {
-      setError(err.response?.data?.msg || 'Email not found in system records.');
-    } finally {
-      setLoading(false);
-    }
+      setStep(5);
+    } catch (err) { setError(err.response?.data?.msg || 'Email not found.'); }
+    finally { setLoading(false); }
   };
 
-  // Finalizes the password reset using the OTP and new password
   const handleResetFinal = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      await API.post('/auth/reset-password', { 
-        email: formData.email, 
-        otp, 
-        newPassword: formData.password 
-      });
+      await API.post('/auth/reset-password', { email: formData.email, otp, newPassword: formData.password });
       setSuccessMsg("Access Key updated. You may now login.");
-      setStep(1);
-      setOtp('');
-    } catch (err) {
-      setError(err.response?.data?.msg || 'Invalid code or reset failed.');
-    } finally {
-      setLoading(false);
-    }
+      setStep(1); setOtp('');
+    } catch (err) { setError(err.response?.data?.msg || 'Reset failed.'); }
+    finally { setLoading(false); }
   };
 
-  const handleSelectMethod = async (method) => {
+  const handleSelectMethod = async () => {
     setLoading(true);
     setError('');
     try {
       await API.post('/auth/send-otp', { userId, method: 'email' }); 
       setStep(3); 
-    } catch (err) {
-      setError('Failed to transmit security code. System fault.');
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { setError('Transmission failed.'); }
+    finally { setLoading(false); }
   };
 
   const handleVerifyOTP = async (e) => {
@@ -121,220 +127,173 @@ const Login = () => {
     try {
       const res = await API.post('/auth/verify-otp', { userId, otp });
       if (res.data.token) {
-        const currentTheme = localStorage.getItem('theme');
-        localStorage.clear(); 
-        if (currentTheme) localStorage.setItem('theme', currentTheme);
         localStorage.setItem('token', res.data.token);
         localStorage.setItem('user', JSON.stringify(res.data.user));
         window.location.replace('/dashboard'); 
       }
-    } catch (err) {
-      setError(err.response?.data?.msg || 'Invalid or expired verification code.');
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { setError('Invalid verification code.'); }
+    finally { setLoading(false); }
   };
 
   return (
     <div style={fullPageWrapper}>
-      <div style={contentSide}>
-        <div style={brandHeader}>
-          <FaShieldAlt style={{ fontSize: '3.5rem', color: 'var(--accent-color)' }} />
-          <h1 style={brandName}>CyberSecure-Hub</h1>
-        </div>
-        
-        <div style={infoSection}>
-          <h2 style={infoTitle}>Security Core v1.0</h2>
-          <p style={infoText}>
-            A centralized, zero-knowledge platform for managing sensitive digital assets 
-            with military-grade encryption standards.
-          </p>
-          
-          <div style={featureGrid}>
-            <div style={featureCard}><FaFolderOpen style={activeIcon} /><div><h4 style={featureHeader}>File Vault</h4><p style={featureDesc}>Encrypted storage.</p></div></div>
-            <div style={featureCard}><FaStickyNote style={activeIcon} /><div><h4 style={featureHeader}>Secure Notes</h4><p style={featureDesc}>AES-256 E2EE.</p></div></div>
-            <div style={featureCard}><FaKey style={activeIcon} /><div><h4 style={featureHeader}>Pass Manager</h4><p style={featureDesc}>Identity protection.</p></div></div>
-            <div style={featureCard}><FaTerminal style={activeIcon} /><div><h4 style={featureHeader}>Key Generator</h4><p style={featureDesc}>Local entropy.</p></div></div>
+      <canvas ref={canvasRef} style={canvasStyle} />
+      
+      <div style={mainContent}>
+        <div style={brandOverlay}>
+          <div style={logoContainer}>
+            <FaShieldAlt style={{...logoIcon, color: themeBlue, filter: `drop-shadow(0 0 10px ${themeBlue})`}} />
+            <span style={logoText}>CYBERHUB</span>
+          </div>
+          <div style={{...liveData, borderLeft: `2px solid ${themeBlue}`}}>
+            <div style={dataLine}>NODE_STATUS: <span style={{color: themeBlue}}>ENCRYPTED</span></div>
+            <div style={dataLine}>REGION: <span style={{color: themeBlue}}>SOUTH_ASIA</span></div>
           </div>
         </div>
-      </div>
 
-      <div style={formSide}>
-        <div style={loginBox}>
-          {/* STEP 1: INITIAL LOGIN/REGISTER */}
-          {step === 1 && (
-            <>
-              <h2 style={{ color: 'var(--text-primary)', marginBottom: '8px' }}>
-                {isLogin ? "Authorized Access" : "Initialize Account"}
-              </h2>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '32px', fontSize: '0.95rem' }}>
-                {isLogin ? "Provide credentials to unlock vault." : "Establish new operative profile."}
-              </p>
-              
-              {successMsg && <p style={successStyle}>✅ {successMsg}</p>}
-              {error && <p style={errorStyle}>⚠️ {error}</p>}
+        <div style={formContainer}>
+          <div style={{...cornerTL, borderColor: themeBlue}} />
+          <div style={{...cornerTR, borderColor: themeBlue}} />
+          <div style={{...cornerBL, borderColor: themeBlue}} />
+          <div style={{...cornerBR, borderColor: themeBlue}} />
+          
+          <div style={{...glassBox, border: `1px solid rgba(56, 189, 248, 0.2)`}}>
+            {/* STEP 1: LOGIN/REGISTER */}
+            {step === 1 && (
+              <>
+                <h2 style={{...formTitle, color: themeBlue}}>{isLogin ? "USER LOGIN" : "INITIALIZE"}</h2>
+                <div style={{...divider, background: `linear-gradient(90deg, transparent, ${themeBlue}, transparent)`}} />
+                
+                {successMsg && <div style={successBox}>{successMsg}</div>}
+                {error && <div style={errorBox}>{error}</div>}
 
-              <form onSubmit={handleSubmit} style={formStyle}>
-                {!isLogin && (
-                  <div style={inputGroup}>
-                    <label style={labelStyle}>Operative Name</label>
-                    <input type="text" name="username" value={formData.username} placeholder="Full Name" onChange={handleChange} required style={inputStyle} />
+                <form onSubmit={handleSubmit} style={formFlow}>
+                  {!isLogin && (
+                    <div style={inputWrap}>
+                      <FaUserPlus style={{...inputIcon, color: themeBlue}} />
+                      <input type="text" name="username" value={formData.username} placeholder="OPERATIVE NAME" onChange={handleChange} required style={{...fieldStyle, border: `1px solid rgba(56, 189, 248, 0.3)`}} />
+                    </div>
+                  )}
+                  <div style={inputWrap}>
+                    <FaEnvelope style={{...inputIcon, color: themeBlue}} />
+                    <input type="email" name="email" value={formData.email} placeholder="SYSTEM EMAIL" onChange={handleChange} required style={{...fieldStyle, border: `1px solid rgba(56, 189, 248, 0.3)`}} />
                   </div>
+                  <div style={inputWrap}>
+                    <FaKey style={{...inputIcon, color: themeBlue}} />
+                    <input type="password" name="password" value={formData.password} placeholder="ACCESS KEY" onChange={handleChange} required style={{...fieldStyle, border: `1px solid rgba(56, 189, 248, 0.3)`}} />
+                  </div>
+                  <button type="submit" disabled={loading} style={{...primaryBtn, background: themeBlue, boxShadow: `0 0 15px rgba(56, 189, 248, 0.4)`}}>
+                    {loading ? "PROCESSING..." : isLogin ? "DECRYPT ACCESS" : "REGISTER PROFILE"}
+                  </button>
+                </form>
+
+                {isLogin && (
+                  <button onClick={() => setStep(4)} style={{...toggleBtn, color: themeBlue, marginTop: '15px', textDecoration: 'none'}}>
+                    Forgot Access Key?
+                  </button>
                 )}
-                <div style={inputGroup}>
-                  <label style={labelStyle}>System Email</label>
-                  <input type="email" name="email" value={formData.email} placeholder="operator@cybersecure.com" onChange={handleChange} required style={inputStyle} />
+
+                <div style={footerAction}>
+                  <button onClick={toggleAuthMode} style={{...toggleBtn, color: themeBlue}}>
+                    {isLogin ? "[ NEW OPERATIVE ]" : "[ BACK TO TERMINAL ]"}
+                  </button>
                 </div>
-                <div style={inputGroup}>
-                  <label style={labelStyle}>Access Key</label>
-                  <input type="password" name="password" value={formData.password} placeholder="••••••••" onChange={handleChange} required style={inputStyle} />
-                </div>
-                <button type="submit" disabled={loading} style={buttonStyle}>
-                  {loading ? "Processing..." : isLogin ? <><FaKey /> Unlock Session</> : <><FaUserPlus /> Create Account</>}
-                </button>
-              </form>
+              </>
+            )}
 
-              {isLogin && (
-                <button onClick={() => setStep(4)} style={{...toggleButton, marginTop: '15px', textDecoration: 'none'}}>
-                  Forgot Access Key?
+            {/* STEP 2: MFA SELECT */}
+            {step === 2 && (
+              <div style={formFlow}>
+                <h2 style={{...formTitle, color: themeBlue}}>MFA REQUIRED</h2>
+                <p style={{textAlign: 'center', fontSize: '0.8rem', opacity: 0.7}}>Request a verification code to your email.</p>
+                <button onClick={handleSelectMethod} style={{...primaryBtn, background: themeBlue}}>
+                  TRANSMIT TO EMAIL
                 </button>
-              )}
-
-              <p style={registerLink}>
-                {isLogin ? "New operative?" : "Already registered?"} 
-                <button onClick={toggleAuthMode} style={toggleButton}>
-                  {isLogin ? "Initialize Account" : "Back to Login"}
-                </button>
-              </p>
-            </>
-          )}
-
-          {/* STEP 2: MFA METHOD SELECT */}
-          {step === 2 && (
-            <>
-              <h2 style={{ color: 'var(--text-primary)', marginBottom: '8px' }}>Security Verification</h2>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '32px', fontSize: '0.95rem' }}>
-                Request a secure access code to your registered system email.
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                <button onClick={() => handleSelectMethod('email')} disabled={loading} style={methodButtonStyle}>
-                  <FaEnvelope style={{ color: 'var(--accent-color)' }} /> Transmit Code to Email
-                </button>
-                <button onClick={() => setStep(1)} style={toggleButton}>
-                  <FaArrowLeft /> Back to Credentials
-                </button>
+                <button onClick={() => setStep(1)} style={toggleBtn}>CANCEL</button>
               </div>
-            </>
-          )}
+            )}
 
-          {/* STEP 3: MFA OTP VERIFY */}
-          {step === 3 && (
-            <>
-              <FaFingerprint style={{ fontSize: '3.5rem', color: 'var(--accent-color)', marginBottom: '20px' }} />
-              <h2 style={{ color: 'var(--text-primary)', marginBottom: '8px' }}>Enter Access Key</h2>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '32px', fontSize: '0.95rem' }}>
-                Input the 6-digit code received in your inbox.
-              </p>
-              {error && <p style={errorStyle}>⚠️ {error}</p>}
-              <form onSubmit={handleVerifyOTP} style={formStyle}>
-                <div style={inputGroup}>
-                  <label style={labelStyle}>One-Time Key</label>
-                  <input type="text" placeholder="000000" maxLength="6" value={otp} onChange={(e) => setOtp(e.target.value)} required style={otpInputStyle} />
-                </div>
-                <button type="submit" disabled={loading} style={buttonStyle}>
-                  {loading ? "Verifying..." : "Unlock Dashboard"}
-                </button>
-                <button type="button" onClick={() => setStep(2)} style={resendButtonStyle}>
-                  Resend Email
-                </button>
+            {/* STEP 3: OTP ENTRY */}
+            {step === 3 && (
+              <form onSubmit={handleVerifyOTP} style={formFlow}>
+                <FaFingerprint style={{fontSize: '3rem', color: themeBlue, alignSelf:'center', marginBottom:'20px'}} />
+                <h2 style={{...formTitle, color: themeBlue}}>VERIFICATION</h2>
+                {error && <div style={errorBox}>{error}</div>}
+                <input type="text" placeholder="000000" maxLength="6" value={otp} onChange={(e) => setOtp(e.target.value)} required style={{...otpInput, border: `1px solid rgba(56, 189, 248, 0.3)`}} />
+                <button type="submit" disabled={loading} style={{...primaryBtn, background: themeBlue}}>AUTHORIZE</button>
+                <button type="button" onClick={() => setStep(2)} style={toggleBtn}>RESEND CODE</button>
               </form>
-            </>
-          )}
+            )}
 
-          {/* STEP 4: FORGOT PASSWORD - EMAIL REQUEST */}
-          {step === 4 && (
-            <>
-              <h2 style={{ color: 'var(--text-primary)', marginBottom: '8px' }}>Recover Access</h2>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '32px', fontSize: '0.95rem' }}>
-                Enter your system email to initiate a security reset.
-              </p>
-              {error && <p style={errorStyle}>⚠️ {error}</p>}
-              <form onSubmit={handleForgotPassword} style={formStyle}>
-                <div style={inputGroup}>
-                  <label style={labelStyle}>System Email</label>
-                  <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="operator@cybersecure.com" required style={inputStyle} />
+            {/* STEP 4: FORGOT PASSWORD REQUEST */}
+            {step === 4 && (
+              <form onSubmit={handleForgotPassword} style={formFlow}>
+                <h2 style={{...formTitle, color: themeBlue}}>RECOVER ACCESS</h2>
+                <p style={{textAlign: 'center', fontSize: '0.8rem', opacity: 0.7}}>Enter your system email to initiate recovery.</p>
+                {error && <div style={errorBox}>{error}</div>}
+                <div style={inputWrap}>
+                  <FaEnvelope style={{...inputIcon, color: themeBlue}} />
+                  <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="SYSTEM EMAIL" required style={{...fieldStyle, border: `1px solid rgba(56, 189, 248, 0.3)`}} />
                 </div>
-                <button type="submit" disabled={loading} style={buttonStyle}>
-                  {loading ? "Transmitting..." : "Send Reset Code"}
-                </button>
-                <button type="button" onClick={() => setStep(1)} style={toggleButton}>
-                  <FaArrowLeft /> Cancel
-                </button>
+                <button type="submit" disabled={loading} style={{...primaryBtn, background: themeBlue}}>SEND RESET CODE</button>
+                <button type="button" onClick={() => setStep(1)} style={toggleBtn}>CANCEL</button>
               </form>
-            </>
-          )}
+            )}
 
-          {/* STEP 5: FORGOT PASSWORD - OTP + NEW PASSWORD */}
-          {step === 5 && (
-            <>
-              <FaSyncAlt style={{ fontSize: '3.5rem', color: 'var(--accent-color)', marginBottom: '20px' }} />
-              <h2 style={{ color: 'var(--text-primary)', marginBottom: '8px' }}>Reset Credentials</h2>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '32px', fontSize: '0.95rem' }}>
-                Verify the reset code and establish a new access key.
-              </p>
-              {successMsg && <p style={successStyle}>✅ {successMsg}</p>}
-              {error && <p style={errorStyle}>⚠️ {error}</p>}
-              <form onSubmit={handleResetFinal} style={formStyle}>
-                <div style={inputGroup}>
-                  <label style={labelStyle}>Reset Code</label>
-                  <input type="text" placeholder="000000" maxLength="6" value={otp} onChange={(e) => setOtp(e.target.value)} required style={otpInputStyle} />
+            {/* STEP 5: FINAL RESET */}
+            {step === 5 && (
+              <form onSubmit={handleResetFinal} style={formFlow}>
+                <FaSyncAlt style={{fontSize: '3rem', color: themeBlue, alignSelf:'center', marginBottom:'20px'}} />
+                <h2 style={{...formTitle, color: themeBlue}}>RESET KEY</h2>
+                {successMsg && <div style={successBox}>{successMsg}</div>}
+                {error && <div style={errorBox}>{error}</div>}
+                <div style={inputWrap}>
+                  <FaFingerprint style={{...inputIcon, color: themeBlue}} />
+                  <input type="text" placeholder="RESET CODE" maxLength="6" value={otp} onChange={(e) => setOtp(e.target.value)} required style={{...fieldStyle, border: `1px solid rgba(56, 189, 248, 0.3)`}} />
                 </div>
-                <div style={inputGroup}>
-                  <label style={labelStyle}>New Access Key</label>
-                  <input type="password" name="password" placeholder="••••••••" onChange={handleChange} required style={inputStyle} />
+                <div style={inputWrap}>
+                  <FaKey style={{...inputIcon, color: themeBlue}} />
+                  <input type="password" name="password" placeholder="NEW ACCESS KEY" onChange={handleChange} required style={{...fieldStyle, border: `1px solid rgba(56, 189, 248, 0.3)`}} />
                 </div>
-                <button type="submit" disabled={loading} style={buttonStyle}>
-                  {loading ? "Updating..." : "Update Credentials"}
-                </button>
-                <button type="button" onClick={() => setStep(4)} style={resendButtonStyle}>
-                  Resend Recovery Email
-                </button>
+                <button type="submit" disabled={loading} style={{...primaryBtn, background: themeBlue}}>UPDATE ACCESS KEY</button>
               </form>
-            </>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-// --- STYLES (NO CHANGES NEEDED TO EXISTING OBJECTS) ---
+/* ===== STYLES ===== */
 
-const fullPageWrapper = { display: 'flex', width: '100vw', height: '100vh', background: 'var(--bg-primary)', position: 'fixed', top: 0, left: 0, zIndex: 999, overflow: 'hidden', transition: 'background 0.3s ease' };
-const contentSide = { flex: 1.4, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 80px', background: 'var(--bg-primary)', borderRight: '1px solid var(--border-color)' };
-const formSide = { flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'var(--bg-primary)' };
-const brandHeader = { display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '60px' };
-const brandName = { color: 'var(--text-primary)', fontSize: '2.8rem', fontWeight: '900', margin: 0 };
-const infoSection = { maxWidth: '600px' };
-const infoTitle = { color: 'var(--text-primary)', fontSize: '2rem', marginBottom: '15px' };
-const infoText = { color: 'var(--text-secondary)', fontSize: '1.1rem', lineHeight: '1.6', marginBottom: '40px' };
-const featureGrid = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' };
-const featureCard = { display: 'flex', gap: '15px' };
-const activeIcon = { color: 'var(--accent-color)', fontSize: '1.5rem', marginTop: '4px' };
-const featureHeader = { color: 'var(--text-primary)', margin: '0 0 5px 0', fontSize: '1rem', fontWeight: '600' };
-const featureDesc = { color: 'var(--text-secondary)', margin: 0, fontSize: '0.85rem', lineHeight: '1.4' };
-const loginBox = { width: '100%', maxWidth: '400px', padding: '40px', background: 'var(--card-bg)', borderRadius: '24px', border: '1px solid var(--border-color)', textAlign: 'center', transition: '0.3s ease' };
-const formStyle = { display: 'flex', flexDirection: 'column', gap: '20px' };
-const inputGroup = { display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left' };
-const labelStyle = { color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase' };
-const inputStyle = { padding: '12px', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', outline: 'none', transition: '0.3s' };
-const otpInputStyle = { ...inputStyle, textAlign: 'center', fontSize: '1.5rem', letterSpacing: '8px' };
-const buttonStyle = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '14px', background: 'var(--accent-color)', color: '#020617', fontWeight: '800', border: 'none', borderRadius: '10px', cursor: 'pointer' };
-const methodButtonStyle = { ...buttonStyle, background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' };
-const errorStyle = { color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', padding: '14px', borderRadius: '8px', marginBottom: '20px', fontSize: '0.9rem' };
-const successStyle = { color: '#22c55e', background: 'rgba(34, 197, 94, 0.1)', padding: '14px', borderRadius: '8px', marginBottom: '20px', fontSize: '0.9rem' };
-const registerLink = { marginTop: '30px', color: 'var(--text-secondary)', fontSize: '0.9rem' };
-const toggleButton = { background: 'none', border: 'none', color: 'var(--accent-color)', fontWeight: 'bold', cursor: 'pointer', marginLeft: '5px', textDecoration: 'underline', display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'center' };
-const resendButtonStyle = { ...toggleButton, marginTop: '10px', textDecoration: 'none' };
+const fullPageWrapper = { width: '100vw', height: '100vh', background: 'radial-gradient(circle at center, #020617 0%, #000000 100%)', color: '#e2e8f0', display: 'flex', overflow: 'hidden', fontFamily: "'JetBrains Mono', monospace" };
+const canvasStyle = { position: 'absolute', top: 0, left: 0, pointerEvents: 'none' };
+const mainContent = { zIndex: 10, display: 'flex', width: '100%', justifyContent: 'space-around', alignItems: 'center', padding: '0 5%' };
+const brandOverlay = { display: 'flex', flexDirection: 'column', gap: '40px' };
+const logoContainer = { display: 'flex', alignItems: 'center', gap: '15px' };
+const logoIcon = { fontSize: '4rem' };
+const logoText = { fontSize: '3rem', fontWeight: '900', letterSpacing: '5px' };
+const liveData = { paddingLeft: '20px', fontSize: '0.8rem', opacity: 0.7 };
+const dataLine = { marginBottom: '5px' };
+const formContainer = { position: 'relative', padding: '10px' };
+const glassBox = { width: '400px', padding: '40px', background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(15px)', boxShadow: '0 0 50px rgba(0, 0, 0, 0.5)', borderRadius: '2px' };
+const cornerCommon = { position: 'absolute', width: '30px', height: '30px', borderWidth: '3px', borderStyle: 'solid' };
+const cornerTL = { ...cornerCommon, top: 0, left: 0, borderRight: 'none', borderBottom: 'none' };
+const cornerTR = { ...cornerCommon, top: 0, right: 0, borderLeft: 'none', borderBottom: 'none' };
+const cornerBL = { ...cornerCommon, bottom: 0, left: 0, borderRight: 'none', borderTop: 'none' };
+const cornerBR = { ...cornerCommon, bottom: 0, right: 0, borderLeft: 'none', borderTop: 'none' };
+const formTitle = { fontSize: '1.5rem', fontWeight: '800', textAlign: 'center', letterSpacing: '2px' };
+const divider = { height: '1px', margin: '20px 0' };
+const formFlow = { display: 'flex', flexDirection: 'column', gap: '25px' };
+const inputWrap = { position: 'relative', display: 'flex', alignItems: 'center' };
+const inputIcon = { position: 'absolute', left: '15px', opacity: 0.6 };
+const fieldStyle = { width: '100%', padding: '15px 15px 15px 45px', background: 'rgba(30, 41, 59, 0.5)', color: '#fff', outline: 'none', fontSize: '0.9rem' };
+const primaryBtn = { padding: '15px', color: '#0f172a', fontWeight: '900', border: 'none', cursor: 'pointer', letterSpacing: '2px', transition: '0.3s' };
+const otpInput = { ...fieldStyle, textAlign: 'center', fontSize: '2rem', letterSpacing: '10px', paddingLeft: '15px' };
+const footerAction = { marginTop: '30px', textAlign: 'center' };
+const toggleBtn = { background: 'none', border: 'none', fontSize: '0.8rem', cursor: 'pointer', opacity: 0.7 };
+const errorBox = { background: 'rgba(239, 68, 68, 0.1)', color: '#f87171', padding: '10px', marginBottom: '20px', fontSize: '0.8rem', borderLeft: '3px solid #ef4444' };
+const successBox = { background: 'rgba(34, 197, 94, 0.1)', color: '#4ade80', padding: '10px', marginBottom: '20px', fontSize: '0.8rem', borderLeft: '3px solid #22c55e' };
 
 export default Login;

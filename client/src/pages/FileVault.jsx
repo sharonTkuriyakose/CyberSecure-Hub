@@ -10,7 +10,8 @@ import {
   FaEye, 
   FaTimes, 
   FaDownload, 
-  FaCalendarAlt 
+  FaCalendarAlt,
+  FaFolderOpen // ✅ New Folder Icon added
 } from 'react-icons/fa';
 
 const FileVault = () => {
@@ -168,9 +169,15 @@ const FileVault = () => {
   return (
     <div style={vaultWrapper}>
       <header style={headerStyle}>
-        <div style={{display:'flex', flexDirection:'column'}}>
-            <h1 style={{ color: 'var(--text-primary)', margin: 0 }}>Secure File Vault</h1>
-            <p style={{color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '5px'}}>Cloud-Based Encrypted Storage</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          {/* ✅ Integrated Folder Icon from your request */}
+          <div style={iconBox}>
+            <FaFolderOpen size={28} color="var(--accent-color)" />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <h1 style={{ color: 'var(--text-primary)', margin: 0, fontSize: '1.5rem' }}>Secure File Vault</h1>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '2px' }}>Cloud-Based Encrypted Storage</p>
+          </div>
         </div>
         <div style={securityBadge}>
           <FaShieldAlt /> <span>System Protected</span>
@@ -179,11 +186,12 @@ const FileVault = () => {
 
       {message.text && (
         <div style={{
-          padding: '10px', 
+          padding: '12px', 
           marginBottom: '20px', 
           borderRadius: '8px', 
-          background: message.type === 'success' ? '#064e3b' : '#7f1d1d',
+          background: message.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
           color: message.type === 'success' ? '#10b981' : '#f87171',
+          border: `1px solid ${message.type === 'success' ? '#064e3b' : '#7f1d1d'}`,
           fontSize: '0.9rem',
           textAlign: 'center'
         }}>
@@ -195,29 +203,30 @@ const FileVault = () => {
       <form onSubmit={handleUpload} style={uploadCard}>
         <input type="file" id="file-input" onChange={(e) => setFile(e.target.files[0])} style={{ display: 'none' }} />
         <label htmlFor="file-input" style={uploadLabel}>
-          <FaCloudUploadAlt size={35} color="var(--accent-color)" />
-          <span style={{ marginTop: '10px', color: 'var(--accent-color)' }}>
+          <FaCloudUploadAlt size={40} color="var(--accent-color)" />
+          <span style={{ marginTop: '15px', color: 'var(--accent-color)', fontWeight: '600' }}>
             {file ? file.name : "Select Document or Image"}
           </span>
+          <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: '5px' }}>Max file size: 50MB</span>
         </label>
         <button disabled={!file || uploading} style={file ? btnActive : btnDisabled}>
-          {uploading ? "Securing Connection..." : "Secure Upload"}
+          {uploading ? "Verifying Vault Path..." : "Secure Upload"}
         </button>
       </form>
 
       {/* ASSET GRID */}
       <div style={gridStyle}>
         {loading ? (
-          <p style={{ color: 'var(--text-secondary)', textAlign: 'center', gridColumn: '1/-1' }}>Decrypting vault assets...</p>
+          <p style={{ color: 'var(--text-secondary)', textAlign: 'center', gridColumn: '1/-1', padding: '40px' }}>Decrypting vault assets...</p>
         ) : files.length === 0 ? (
-           <p style={{ color: 'var(--text-secondary)', textAlign: 'center', gridColumn: '1/-1' }}>No assets found in vault.</p>
+           <p style={{ color: 'var(--text-secondary)', textAlign: 'center', gridColumn: '1/-1', padding: '40px' }}>No assets found in vault.</p>
         ) : files.map(f => (
           <div key={f._id} style={cardStyle}>
             <div style={previewBox}>
               {f.fileType?.includes('image') && f.fileUrl ? (
                 <img src={f.fileUrl} alt="Secure Preview" style={imgStyle} />
               ) : (
-                <FaFileAlt size={45} color="var(--text-secondary)" />
+                <FaFolderOpen size={45} color="rgba(56, 189, 248, 0.4)" />
               )}
             </div>
             <div style={infoStyle}>
@@ -229,10 +238,10 @@ const FileVault = () => {
               </div>
 
               <div style={actions}>
-                <button onClick={() => handleView(f)} style={iconBtn}>
+                <button onClick={() => handleView(f)} style={iconBtn} title="View File">
                   <FaEye size={18} />
                 </button>
-                <button onClick={() => handleDelete(f._id, f.storagePath)} style={deleteBtn}>
+                <button onClick={() => handleDelete(f._id, f.storagePath)} style={deleteBtn} title="Delete Forever">
                   <FaTrashAlt size={16} />
                 </button>
               </div>
@@ -269,8 +278,8 @@ const FileVault = () => {
                 </div>
               ) : (
                 <div style={unsupportedBox}>
-                  <FaFileAlt size={60} color="var(--text-secondary)" />
-                  <p style={{marginTop: '20px', color: 'var(--text-primary)'}}>Preview not available.</p>
+                  <FaFolderOpen size={60} color="var(--text-secondary)" />
+                  <p style={{marginTop: '20px', color: 'var(--text-primary)'}}>Preview not available for this file type.</p>
                   <a href={previewFile.fileUrl} target="_blank" rel="noreferrer" style={downloadFallback}>Download Asset</a>
                 </div>
               )}
@@ -283,32 +292,33 @@ const FileVault = () => {
 };
 
 /* ===== STYLES ===== */
-const vaultWrapper = { padding: '40px', maxWidth: '1100px', margin: '0 auto' };
-const headerStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', borderBottom: '1px solid var(--border-color)', paddingBottom: '20px' };
+const vaultWrapper = { padding: '40px', maxWidth: '1100px', margin: '0 auto', animation: 'fadeIn 0.5s ease' };
+const headerStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', borderBottom: '1px solid var(--border-color)', paddingBottom: '25px' };
+const iconBox = { background: 'rgba(56, 189, 248, 0.1)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(56, 189, 248, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' };
 const securityBadge = { background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: '8px 16px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #064e3b' };
-const uploadCard = { background: 'var(--bg-secondary)', padding: '40px', borderRadius: '16px', border: '2px dashed var(--border-color)', textAlign: 'center' };
+const uploadCard = { background: 'var(--bg-secondary)', padding: '50px 40px', borderRadius: '20px', border: '2px dashed var(--border-color)', textAlign: 'center', transition: 'all 0.3s ease' };
 const uploadLabel = { cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center' };
-const btnActive = { width: '100%', maxWidth: '300px', marginTop: '25px', padding: '12px', background: 'var(--accent-color)', borderRadius: '8px', border: 'none', fontWeight: '900', color: '#020617', cursor: 'pointer' };
-const btnDisabled = { ...btnActive, background: 'var(--border-color)', color: 'var(--text-secondary)', cursor: 'not-allowed' };
-const gridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '25px', marginTop: '40px' };
-const cardStyle = { background: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden', display: 'flex', flexDirection: 'column' };
-const previewBox = { height: '150px', background: 'rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' };
+const btnActive = { width: '100%', maxWidth: '300px', marginTop: '30px', padding: '14px', background: 'var(--accent-color)', borderRadius: '10px', border: 'none', fontWeight: '900', color: '#020617', cursor: 'pointer', transition: 'transform 0.2s ease', boxShadow: '0 4px 15px rgba(56, 189, 248, 0.2)' };
+const btnDisabled = { ...btnActive, background: 'var(--border-color)', color: 'var(--text-secondary)', cursor: 'not-allowed', boxShadow: 'none' };
+const gridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '30px', marginTop: '50px' };
+const cardStyle = { background: 'var(--card-bg)', borderRadius: '16px', border: '1px solid var(--border-color)', overflow: 'hidden', display: 'flex', flexDirection: 'column', transition: 'transform 0.2s ease, border-color 0.2s ease' };
+const previewBox = { height: '160px', background: 'rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' };
 const imgStyle = { width: '100%', height: '100%', objectFit: 'cover' };
-const infoStyle = { padding: '15px' };
-const fileName = { color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: '0' };
-const dateWrapper = { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '5px', marginBottom: '15px' };
-const dateText = { color: 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: '500' };
+const infoStyle = { padding: '20px' };
+const fileName = { color: 'var(--text-primary)', fontSize: '0.9rem', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: '0' };
+const dateWrapper = { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', marginBottom: '18px' };
+const dateText = { color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: '500' };
 const actions = { display: 'flex', justifyContent: 'space-between', alignItems: 'center' };
-const iconBtn = { color: 'var(--accent-color)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '5px' };
-const deleteBtn = { ...iconBtn, color: '#ef4444' };
-const modalOverlay = { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(2, 6, 23, 0.9)', backdropFilter: 'blur(10px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10000 };
-const modalContent = { background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '24px', width: '95%', maxWidth: '1100px', height: '95vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' };
-const modalHeader = { padding: '15px 25px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' };
-const closeBtn = { background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '1.2rem' };
-const mediaContainer = { padding: '10px', flex: 1, overflowY: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#1a1a1a' };
-const previewImage = { maxWidth: '100%', maxHeight: '80vh', borderRadius: '8px' };
-const pdfFrameStyle = { width: '100%', height: '75vh', border: 'none', borderRadius: '8px', background: '#fff' };
-const unsupportedBox = { textAlign: 'center', padding: '20px' };
-const downloadFallback = { display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '15px', padding: '12px 20px', background: 'var(--accent-color)', color: '#020617', textDecoration: 'none', borderRadius: '8px', fontWeight: 'bold' };
+const iconBtn = { color: 'var(--accent-color)', background: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.2)', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '8px', transition: 'all 0.2s ease' };
+const deleteBtn = { ...iconBtn, color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)' };
+const modalOverlay = { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(2, 6, 23, 0.92)', backdropFilter: 'blur(12px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10000 };
+const modalContent = { background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '24px', width: '95%', maxWidth: '1100px', height: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' };
+const modalHeader = { padding: '20px 30px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' };
+const closeBtn = { background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '1.5rem' };
+const mediaContainer = { padding: '20px', flex: 1, overflowY: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#0a0a0a' };
+const previewImage = { maxWidth: '100%', maxHeight: '100%', borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' };
+const pdfFrameStyle = { width: '100%', height: '70vh', border: 'none', borderRadius: '12px', background: '#fff' };
+const unsupportedBox = { textAlign: 'center', padding: '40px' };
+const downloadFallback = { display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '20px', padding: '14px 28px', background: 'var(--accent-color)', color: '#020617', textDecoration: 'none', borderRadius: '10px', fontWeight: '800', transition: 'transform 0.2s ease' };
 
 export default FileVault;
