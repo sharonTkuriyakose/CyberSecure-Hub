@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getNotes, addNote, deleteNote } from '../services/api';
 import CryptoJS from 'crypto-js';
-import { FaShieldAlt, FaPlus, FaTrashAlt, FaStickyNote, FaLock } from 'react-icons/fa';
+import { FaShieldAlt, FaPlus, FaTrashAlt, FaStickyNote, FaLock, FaCalendarAlt } from 'react-icons/fa';
 
 const SecureNotes = () => {
   const [notes, setNotes] = useState([]);
@@ -16,10 +16,10 @@ const SecureNotes = () => {
   }, []);
 
   /**
-   * ✅ Safely formats the MongoDB timestamp
+   * ✅ Safely formats the MongoDB timestamp or Local Submission Date
    */
   const formatStoredDate = (dateString) => {
-    if (!dateString) return "Date Unknown";
+    if (!dateString) return "Processing...";
     const date = new Date(dateString);
     
     // Check if the date object is valid to prevent "Invalid Date" display
@@ -28,7 +28,9 @@ const SecureNotes = () => {
     return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
     });
   };
 
@@ -50,6 +52,8 @@ const SecureNotes = () => {
         }
       });
       
+      // Sort notes by date (newest first)
+      decryptedData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       setNotes(decryptedData);
     } catch (err) {
       console.error("Failed to fetch notes");
@@ -64,10 +68,19 @@ const SecureNotes = () => {
 
     const encryptedContent = CryptoJS.AES.encrypt(newNote.content, secretKey).toString();
     
+    // Capture the exact moment of submission locally
+    const submissionDate = new Date().toISOString();
+
     try {
-      await addNote({ title: newNote.title, content: encryptedContent });
+      // Send the encrypted content to your API
+      await addNote({ 
+        title: newNote.title, 
+        content: encryptedContent,
+        createdAt: submissionDate // Fallback if server doesn't auto-generate
+      });
+      
       setNewNote({ title: '', content: '' });
-      fetchAndDecryptNotes(); 
+      fetchAndDecryptNotes(); // Refresh list to show the new note with its timestamp
     } catch (err) {
       console.error("Encryption/Upload failed");
     }
@@ -149,9 +162,12 @@ const SecureNotes = () => {
               </div>
               <p style={noteContent}>{note.content}</p>
               
-              {/* ✅ UPDATED DATE DISPLAY */}
-              <div style={timestamp}>
-                Stored: {formatStoredDate(note.createdAt)}
+              {/* ✅ UPDATED DATE DISPLAY WITH ICON */}
+              <div style={timestampContainer}>
+                <FaCalendarAlt size={12} color="var(--accent-color)" />
+                <span style={timestampText}>
+                  Captured: {formatStoredDate(note.createdAt || note.date)}
+                </span>
               </div>
             </div>
           ))}
@@ -264,7 +280,16 @@ const noteContent = {
   whiteSpace: 'pre-wrap' 
 };
 
-const timestamp = { 
+const timestampContainer = { 
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  marginTop: 'auto',
+  paddingTop: '15px',
+  borderTop: '1px solid var(--border-color)'
+};
+
+const timestampText = { 
   fontSize: '0.75rem', 
   color: 'var(--text-secondary)', 
   fontWeight: '600' 

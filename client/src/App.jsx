@@ -16,22 +16,19 @@ const AppContent = () => {
   const location = useLocation();
   
   // 1. AUTHENTICATION STATE
+  // We check for the token but rely on the Routes to handle the "entry" logic
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
 
   // 2. GLOBAL THEME STATE
-  // Pull initial theme from storage or default to dark
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
 
-  // Sync auth and theme whenever the location changes
   useEffect(() => {
     setIsAuthenticated(!!localStorage.getItem('token'));
     
-    // Refresh theme from storage to ensure consistency across pages
     const savedTheme = localStorage.getItem('theme') || 'dark';
     setTheme(savedTheme);
 
     // 3. GLOBAL CSS APPLICATION
-    // Apply background and text colors to the entire document body
     if (savedTheme === 'dark') {
       document.body.style.backgroundColor = '#020617';
       document.body.style.color = '#f8fafc';
@@ -41,9 +38,11 @@ const AppContent = () => {
     }
   }, [location.pathname]);
 
+  // Identify special pages
   const authPaths = ['/login', '/register', '/verifyOTP'];
   const isAuthPage = authPaths.includes(location.pathname);
   
+  // Only show sidebar if authenticated AND not on an auth/login page
   const shouldShowSidebar = isAuthenticated && !isAuthPage;
 
   return (
@@ -57,16 +56,18 @@ const AppContent = () => {
         flex: 1, 
         marginLeft: shouldShowSidebar ? '260px' : '0', 
         transition: 'all 0.3s ease',
-        background: 'transparent', // Inherits from appContainerStyle or body
+        background: 'transparent',
         minHeight: '100vh',
         width: '100%',
         color: theme === 'dark' ? '#f8fafc' : '#0f172a'
       }}>
         <Routes>
+          {/* Public Auth Routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/verifyOTP" element={<VerifyOTP />} />
           
+          {/* Protected Vault Routes */}
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/notes" element={<SecureNotes />} />
@@ -76,10 +77,12 @@ const AppContent = () => {
             <Route path="/settings" element={<Settings />} />
           </Route>
 
-          <Route path="/" element={
-            isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />
-          } />
+          {/* 🛡️ FIXED REDIRECTION LOGIC */}
+          {/* If the user hits '/', we always send them to Login. 
+              The Login page itself has logic to clear old tokens. */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
           
+          {/* Fallback for unknown paths */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </div>
