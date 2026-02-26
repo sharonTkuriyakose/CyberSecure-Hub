@@ -1,45 +1,111 @@
-🛡️ CyberSecure-Hub: Technical Architecture & Workflow
-CyberSecure-Hub is a zero-knowledge security ecosystem designed for operatives to manage digital assets with military-grade protection. The platform utilizes the MERN stack to provide an end-to-end encrypted environment where the server never has access to raw user data.
+# 🛡️ CyberSecure-Hub  
+### Zero-Knowledge MERN Security Dashboard
 
-🔐 The Security Workflow
-The platform follows a strict "Verify-First" protocol to ensure only authorized operatives can access the Command Center.
+---
 
-1. Multi-Factor Authentication (MFA) Journey
-The authentication process is a three-tier handshake designed to eliminate unauthorized access:
+## 🚀 Visual Tech Stack
 
-Credential Verification: The operative provides system email and a master access key.
+<p align="center">
 
-OTP Transmission: Upon successful credential check, a 6-digit One-Time Password is sent via a secure email utility.
+![React](https://img.shields.io/badge/Frontend-React-61DAFB?style=for-the-badge&logo=react&logoColor=white)
+![Node.js](https://img.shields.io/badge/Backend-Node.js-339933?style=for-the-badge&logo=node.js&logoColor=white)
+![Express.js](https://img.shields.io/badge/API-Express.js-000000?style=for-the-badge&logo=express&logoColor=white)
+![MongoDB](https://img.shields.io/badge/Database-MongoDB-47A248?style=for-the-badge&logo=mongodb&logoColor=white)
+![Supabase](https://img.shields.io/badge/Storage-Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
 
-Session Initialization: After OTP verification, the system clears stale data, preserves theme preferences, and issues a JWT-signed session token.
+</p>
 
-2. Zero-Knowledge Encryption Logic
-The core of the "Hub" is its zero-knowledge architecture. This means the encryption happens locally on your machine before the data is ever sent to the database.
+---
 
-Local Encryption: Content in the Secure Notes vault is encrypted using AES-256 on the client side.
+## 🧠 Architecture Overview
 
-Encrypted Storage: Only the encrypted "ciphertext" is stored in MongoDB.
+<p align="center">
+  <img src="./assets/architecture-banner.png" alt="CyberSecure-Hub Architecture Diagram" width="100%" />
+</p>
 
-Decryption on Demand: Data is only decrypted in the browser when the operative is actively viewing the notes with the local secret key.
+> A Zero-Knowledge MERN ecosystem where **the server never has access to raw user data**.
 
-🖥️ Command Center Interface
-The Dashboard serves as the operative's central HUD (Heads-Up Display), providing a real-time overview of all secured assets.
+---
 
-Secure Notes: Access E2EE notes encrypted with AES-256 standards.
+# 🛡️ CyberSecure-Hub: Technical Architecture & Workflow
 
-File Vault: Secure asset storage with Cloudinary integration.
+CyberSecure-Hub is a **Zero-Knowledge Security Dashboard** built on the MERN stack, designed to function as a high-security intelligence command center.
 
-Password Manager: High-security credential management with visibility toggles.
+The core philosophy:
 
-Key Generator: Local entropy-based generator for industrial-strength keys.
+> 🔐 **If the server never sees plaintext, it can never leak plaintext.**
 
-🎨 Global Theming & Persistence
-The platform features a system-wide theme synchronization that allows for seamless transitions between operational environments.
+---
 
-CSS Variables: The entire UI is driven by variables (e.g., var(--bg-primary)), allowing for instant theme switching across all vaults.
+## 🔐 Core Logic — Zero-Knowledge Ecosystem
 
-Local Persistence: Theme choices are stored in localStorage, ensuring the hub remembers the operative's preference across sessions.
+CyberSecure-Hub operates under a strict **client-side encryption model**:
 
-Responsive Design: The Sidebar and Dashboard are optimized for high-intensity monitoring, ensuring clarity in both light and dark modes.
+- All sensitive data is encrypted in the browser
+- AES-256 encryption is performed before transmission
+- The backend only stores encrypted ciphertext
+- Decryption occurs exclusively on the client
 
-Project Lead: Sharon T Kuriyakose
+### 🔎 What This Means
+
+- The server **cannot read user notes**
+- The database **cannot access file contents**
+- Even if breached, attackers retrieve only encrypted payloads
+
+This architecture ensures:
+
+✔️ True data privacy  
+✔️ Reduced attack surface  
+✔️ Zero raw exposure risk  
+
+---
+
+## 🔑 Security Workflow — Three-Tier MFA Handshake
+
+CyberSecure-Hub implements a structured Multi-Factor Authentication (MFA) journey:
+
+### 🧾 1️⃣ Credential Verification
+- Email + password validation
+- Password hashed before database comparison
+- Initial session token withheld
+
+### 📲 2️⃣ OTP Transmission
+- One-Time Password generated
+- Secure delivery via verified channel
+- Time-bound validation window
+
+### 🖥️ 3️⃣ Session Initialization
+- OTP verification success triggers session creation
+- Secure JWT issued
+- Encrypted session context established
+
+This layered handshake ensures:
+
+- No direct login bypass
+- Controlled authentication flow
+- Secure session lifecycle management
+
+---
+
+## 🔒 Encryption Logic — AES-256 Client-Side
+
+CyberSecure-Hub uses **AES-256 symmetric encryption** via CryptoJS.
+
+### Encryption Flow
+
+1. User inputs secure data
+2. Data encrypted locally using AES-256
+3. Ciphertext transmitted to backend
+4. MongoDB stores only encrypted strings
+5. On retrieval, decryption occurs client-side
+
+### 🗄️ Database Behavior
+
+MongoDB stores:
+
+```json
+{
+  "title": "Encrypted String",
+  "content": "U2FsdGVkX1+XzP...",
+  "metadata": "Encrypted Blob"
+}
