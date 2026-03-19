@@ -4,39 +4,40 @@ const cors = require('cors');
 const connectDB = require('./config/db');
 const path = require('path');
 
-// 1. Load and Debug Environment Variables (CRITICAL STEP)
-// We must load these before connectDB() or any route imports
-const envPath = path.join(__dirname, '.env');
-const result = dotenv.config({ path: envPath });
+// 1. Load Environment Variables
+dotenv.config(); 
 
-console.log('--- Environment Check ---');
-console.log('File Path:', envPath);
-
-if (result.error) {
-  console.log('❌ Error loading .env file:', result.error.message);
-} else {
-  const keys = Object.keys(result.parsed || {});
-  console.log(`✅ Loaded ${keys.length} variables from .env`);
-  
-  // Debugging specifically for Nodemailer credentials
-  console.log(`EMAIL_USER: ${process.env.EMAIL_USER ? 'FOUND (' + process.env.EMAIL_USER + ')' : '❌ NOT FOUND'}`);
-  console.log(`EMAIL_PASS: ${process.env.EMAIL_PASS ? 'FOUND (Length: ' + process.env.EMAIL_PASS.length + ')' : '❌ NOT FOUND'}`);
-
-  if (keys.length === 0) {
-    console.log('⚠️ WARNING: .env file found but it appears to be empty or misformatted.');
-  }
-}
+console.log('--- System Initialization ---');
+console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 
 // 2. Connect to Database (MongoDB Atlas)
 connectDB();
 
 const app = express();
 
-// 3. Explicit Middleware Configuration
+// 3. Updated CORS Configuration for Production
+const allowedOrigins = [
+  'http://localhost:5173',                   // Local Vite dev
+  'http://localhost:3000',                   // Local React dev (CRA)
+  'https://cyber-secure-hub-mu.vercel.app',  // Your Vercel URL
+  'https://cybersecure-hub.in'               // Your Custom Domain
+];
+
 app.use(cors({
-  origin: 'http://localhost:3000', 
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log("🚫 CORS Blocked for Origin:", origin);
+      callback(new Error('Not allowed by CORS Policy'));
+    }
+  },
   credentials: true
 }));
+
 app.use(express.json());
 
 // 4. Route Imports
@@ -47,20 +48,21 @@ const dataRoutes = require('./routes/dataRoutes');
 app.use('/api/auth', authRoutes);
 app.use('/api/data', dataRoutes);
 
-// Basic Route for testing
+// Base Route for Health Check
 app.get('/', (req, res) => {
-  res.send('CyberSecure-Hub API is running...');
+  res.json({ status: "Online", message: "CyberSecure-Hub API is fully operational." });
 });
 
 // 6. Start the Server
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+  console.log(`🚀 Server active on port ${PORT}`);
   
-  // Final verification logs for operational status
-  console.log(`--- System Readiness Check ---`);
-  console.log(`Cloudinary Name: ${process.env.CLOUDINARY_CLOUD_NAME ? '✅' : '❌'}`);
-  console.log(`Mongo URI: ${process.env.MONGO_URI ? '✅' : '❌'}`);
-  console.log(`SMTP Credentials: ${process.env.EMAIL_PASS ? '✅ Ready for OTP' : '❌ OTP Service Disabled'}`);
+  // Final verification logs for operational status (Secure version)
+  console.log(`--- Security Intelligence Check ---`);
+  console.log(`MongoDB Connection: ${process.env.MONGO_URI ? '✅ SECURE' : '❌ OFFLINE'}`);
+  console.log(`Mailjet (OTP): ${process.env.MJ_APIKEY_PUBLIC ? '✅ ARMED' : '❌ DISABLED'}`);
+  console.log(`Cloudinary: ${process.env.CLOUDINARY_CLOUD_NAME ? '✅ ACTIVE' : '❌ INACTIVE'}`);
+  console.log(`Encryption Key: ${process.env.ENCRYPTION_KEY ? '✅ LOADED' : '❌ MISSING'}`);
 });
